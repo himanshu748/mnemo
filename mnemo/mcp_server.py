@@ -14,6 +14,7 @@ import os
 from typing import Optional, Tuple
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from .agent import MemoryAgent
 from .client import LLMClient
@@ -26,11 +27,21 @@ _client = LLMClient()
 # relative to each other even though they're built independently.
 _router = get_router(_client, data_dir=os.environ.get("MNEMO_DATA_DIR", "data"))
 
+# The SDK's DNS-rebinding guard only allow-lists localhost by default, which
+# 421s every real client hitting the public Space URL. Allow-list that host
+# explicitly (configurable, since the Space name can change) instead of
+# disabling the protection outright.
+_PUBLIC_HOST = os.environ.get("MNEMO_PUBLIC_HOST", "himanshukumarjha-mnemo.hf.space")
+
 mcp = FastMCP(
     "mnemo",
     instructions=(
         "Long-term memory shared with the caller's Slack workspace. Every "
         "tool call needs `token` - get one in Slack by running `/mnemo-token`."
+    ),
+    transport_security=TransportSecuritySettings(
+        allowed_hosts=[_PUBLIC_HOST, "127.0.0.1:*", "localhost:*"],
+        allowed_origins=["https://%s" % _PUBLIC_HOST, "http://127.0.0.1:*", "http://localhost:*"],
     ),
 )
 
