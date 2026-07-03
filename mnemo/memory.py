@@ -151,12 +151,32 @@ class MemoryStore:
         return pruned
 
     # -------------------------- consolidation ---------------------------
+    def _classify_cluster(self, texts: List[str]) -> str:
+        """Ask the LLM whether related notes agree or contradict each other.
+        Returns "agree" or "conflict". Cosine similarity alone can't tell these
+        apart - "standup is at 9" and "standup is at 9:30" are topically
+        near-identical but factually contradictory."""
+        messages = [
+            {"role": "system", "content": (
+                "You will see 2+ short related notes. Reply with exactly one "
+                "word: 'agree' if they are consistent (same fact, a paraphrase, "
+                "or one refining another), or 'conflict' if they contradict "
+                "each other (different values for the same thing - a time, "
+                "date, person, place, or decision).")},
+            {"role": "user", "content": "\n".join("- %s" % t for t in texts)},
+        ]
+        verdict = self.client.chat(messages, temperature=0.0, max_tokens=5).strip().lower()
+        return "conflict" if "conflict" in verdict else "agree"
+
     def consolidate(self, similarity_threshold: float = 0.55,
-                    min_cluster: int = 2, max_clusters: int = 5) -> List[MemoryItem]:
-        """Sleep-time pass: cluster related episodic memories and summarize each
-        cluster into one durable semantic memory via the LLM. Source episodics
-        are demoted (importance lowered) so consolidated knowledge dominates
-        retrieval and the raw events eventually decay away."""
+                    min_cluster: int = 2, max_clusters: int = 5
+                    ) -> Tuple[List[MemoryItem], List[Dict[str, object]]]:
+        """Sleep-time pass: cluster related episodic memories. Agreeing
+        clusters are summarized into one durable semantic memory via the LLM;
+        source episodics are demoted (importance lowered) so consolidated
+        knowledge dominates retrieval and the raw events eventually decay away.
+        Conflicting clusters are left alone and reported instead of silently
+        merged, so a caller (e.g. the Slack bot) can flag them to the team."""
         episodics = [it for it in self.items.values() if it.kind == EPISODIC]
         used: set = set()
         clusters: List[List[MemoryItem]] = []
@@ -177,8 +197,16 @@ class MemoryStore:
                 break
 
         new_semantic: List[MemoryItem] = []
+        conflicts: List[Dict[str, object]] = []
         for cluster in clusters:
-            joined = "\n".join("- %s" % c.text for c in cluster)
+            texts = [c.text for c in cluster]
+            if self._classify_cluster(texts) == "conflict":
+                conflicts.append({
+                    "texts": texts,
+                    "ids": [c.id for c in cluster],
+                })
+                continue
+            joined = "\n".join("- %s" % t for t in texts)
             messages = [
                 {"role": "system", "content": "Summarize the related notes below into ONE concise, durable fact. Reply with the fact only."},
                 {"role": "user", "content": joined},
@@ -192,7 +220,7 @@ class MemoryStore:
             for c in cluster:
                 c.importance = _clamp(c.importance * 0.4)  # demote raw events
             new_semantic.append(sem)
-        return new_semantic
+        return new_semantic, conflicts
 
     # ------------------------------ stats -------------------------------
     def stats(self) -> Dict[str, object]:

@@ -1,11 +1,15 @@
-"""HF Space entrypoint: run the Mnemo Slack bot (Socket Mode) in a background
-thread, and serve a tiny health endpoint on the Space port so the Space stays
-'running'. The health text reports real bot state — if the bot thread died or
-secrets are missing, it says so instead of pretending all is well."""
+"""HF Space entrypoint. Runs three things in one process, sharing the
+Space's single exposed port:
+
+1. the Slack bot (Socket Mode) in a background thread
+2. a health check at "/" that reports real bot state
+3. the Mnemo MCP server (streamable-http) at "/mcp", so any MCP client
+   (Claude Desktop, Claude Code, ...) can share the exact memory Slack sees
+"""
+import contextlib
 import os
 import threading
 import logging
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -29,22 +33,43 @@ def run_bot():
         print("Bot crashed:", exc, flush=True)
 
 
-class Health(BaseHTTPRequestHandler):
-    def do_GET(self):
-        ok = STATUS["bot"].startswith("connected")
-        body = ("Mnemo is running. Talk to the bot in Slack. [bot: %s]" if ok
-                else "Mnemo health server is up, but the bot is not: %s") % STATUS["bot"]
-        self.send_response(200 if ok else 503)
-        self.send_header("Content-Type", "text/plain")
-        self.end_headers()
-        self.wfile.write(body.encode("utf-8"))
+def build_web_app():
+    from starlette.applications import Starlette
+    from starlette.responses import PlainTextResponse
+    from starlette.routing import Route, Mount
 
-    def log_message(self, *args):
-        pass
+    from mnemo.mcp_server import mcp
+
+    async def health(request):
+        ok = STATUS["bot"].startswith("connected")
+        body = (
+            "Mnemo is running. Talk to the bot in Slack. [bot: %s] "
+            "MCP endpoint: /mcp (get a token in Slack via /mnemo-token)."
+        ) % STATUS["bot"] if ok else (
+            "Mnemo health server is up, but the bot is not: %s" % STATUS["bot"]
+        )
+        return PlainTextResponse(body, status_code=200 if ok else 503)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_app):
+        # FastMCP's streamable-http transport needs its session manager
+        # actually running; mounting the sub-app alone doesn't start it.
+        async with contextlib.AsyncExitStack() as stack:
+            await stack.enter_async_context(mcp.session_manager.run())
+            yield
+
+    return Starlette(
+        routes=[
+            Route("/", health),               # exact "/" -> health
+            Mount("/", app=mcp.streamable_http_app()),  # everything else -> MCP (serves "/mcp")
+        ],
+        lifespan=lifespan,
+    )
 
 
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
+    import uvicorn
     port = int(os.environ.get("PORT", "7860"))
-    print("Health server listening on", port, flush=True)
-    HTTPServer(("0.0.0.0", port), Health).serve_forever()
+    print("Web server (health + MCP) listening on", port, flush=True)
+    uvicorn.run(build_web_app(), host="0.0.0.0", port=port)

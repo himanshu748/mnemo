@@ -23,6 +23,9 @@ features:
     - command: /sleep
       description: Consolidate and prune memories (sleep-time pass)
       should_escape: false
+    - command: /mnemo-token
+      description: Get a personal token to connect Mnemo to Claude Desktop/Code over MCP
+      should_escape: false
   shortcuts:
     - name: Remember this
       type: message

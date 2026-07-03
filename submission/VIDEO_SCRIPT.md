@@ -1,16 +1,16 @@
-# Demo video script — target 2:40 (hard limit 3:00)
+# Demo video script — target 2:55 (hard limit 3:00)
 
-**Setup before recording:** clean sandbox workspace, Mnemo installed and green; one public channel `#project-atlas` with mnemo invited; Assistant pane empty (fresh user or after wiping the data dir); screen recorder at 1080p; mic ready. Kill notifications (macOS Focus mode).
+**Setup before recording:** clean sandbox workspace, Mnemo installed and green; one public channel `#project-atlas` with mnemo invited; Assistant pane empty (fresh user or after wiping the data dir); Claude Desktop or Claude Code open in a second window with Mnemo NOT yet added as an MCP server; screen recorder at 1080p; mic ready. Kill notifications (macOS Focus mode).
 
 **Rule from Devpost:** no copyrighted music, video must show the real project functioning.
 
 ---
 
-### 0:00–0:20 — Hook (Assistant pane visible, empty)
+### 0:00–0:15 — Hook (Assistant pane visible, empty)
 
-> "Every Slack bot has amnesia. Tell it your deadline today — tomorrow it's a stranger. And the usual fix, replaying your entire history into every prompt, gets slower and more expensive every day. This is Mnemo: a Slack teammate with an actual memory lifecycle. Watch."
+> "Every Slack bot has amnesia. Tell it your deadline today — tomorrow it's a stranger. This is Mnemo: a Slack teammate with an actual memory lifecycle — and memory that follows you off Slack too. Watch."
 
-### 0:20–1:00 — Teach it, then test it (Assistant pane)
+### 0:15–0:50 — Teach it, then test it (Assistant pane)
 
 Type, one after another:
 
@@ -18,40 +18,49 @@ Type, one after another:
 2. `I prefer answers as short bullet points.`
 3. Then ask a **paraphrase**, not the same words: `When do we need to stop merging to staging?`
 
-> "I never said 'stop merging' — Mnemo recalled the freeze rule and did the date math. And look at the footer: it answered from 2 memories, ~40 context tokens — not my whole chat history. That accounting is in every reply."
+> "I never said 'stop merging' — Mnemo recalled the freeze rule and did the date math. Look at the footer: it answered from 2 memories, ~40 context tokens — not my whole chat history. That accounting is in every reply."
 
 *(Zoom/point at the footer: "recalled N memories · N context tokens · % smaller".)*
 
-### 1:00–1:30 — Explicit controls (any channel or DM)
+### 0:50–1:10 — Explicit controls
 
-- `/remember The client demo login is demo@acme.test` → show the confirmation + store stats.
+- `/remember The client demo login is demo@acme.test` → show the confirmation.
 - `/recall demo` → show it surfaces the right fact.
 
-> "Slash commands give you direct control — remember stores a fact, recall shows you exactly what the agent would retrieve, under the same token budget."
+> "Slash commands give direct control — and any message can become memory too, via the 'Remember this' shortcut in the ⋯ menu."
 
-- Hover a teammate's message → ⋯ → **Remember this**.
+### 1:10–1:50 — The differentiator: /sleep (consolidate AND flag conflicts, one pass)
 
-> "Any message in Slack can become memory in two clicks."
+In `#project-atlas`, seed four facts quickly:
 
-### 1:30–2:05 — The differentiator: /sleep (Assistant pane or DM)
+1. `/remember Standup is at 9am.`
+2. `/remember Standup is at 9:30am.`
+3. `/remember Ravi runs standup on Fridays.`
+4. `/remember Ravi is the one running our Friday standups.`
 
-First add 2–3 related facts quickly (e.g. `/remember Standup moved to 9:30`, `/remember Standup is now on Zoom not Meet`, `/remember Ravi runs standup on Fridays`). Then:
+Then: `/sleep`
 
-- `/sleep`
+> "Watch what one sleep pass does. Facts 3 and 4 agree — Mnemo merges them into one durable fact and lets the raw duplicates fade. But facts 1 and 2 *disagree* — different times for the same thing — so instead of silently picking one, it flags the conflict right back to the channel and asks the team to resolve it. That's the difference between storage and judgment."
 
-> "This is what makes Mnemo different. Like a brain during sleep, it clusters related raw memories and compresses them into one durable fact — and low-value stale memories decay and get pruned. Memory that gets *better* while nobody's talking to it. That's why the context stays small forever."
+*(Show the response: consolidated fact, pruned count, and the ⚠️ conflict message posted in-channel.)*
 
-*(Show the response: "consolidated N, pruned N", read the consolidated fact aloud.)*
+### 1:50–2:05 — Shared channel memory
 
-### 2:05–2:25 — Shared channel memory
+`@mnemo what do you know about this project?`
 
-In `#project-atlas`: `@mnemo what do you know about this project?`
+> "Channels get shared team memory, separate from everyone's private memory — what the team teaches Mnemo here, the whole team can recall here."
 
-> "Channels get shared team memory — separate from everyone's private memory. What the team teaches Mnemo here, the whole team can recall here."
+### 2:05–2:45 — The same memory, outside Slack (MCP)
 
-### 2:25–2:40 — Close (architecture diagram on screen)
+- `/mnemo-token` → show the token response in Slack.
+- Cut to Claude Desktop/Code: add Mnemo as an MCP server at the given URL, paste the token into the first message.
+- Ask it: `What does Mnemo remember about my staging freeze?`
 
-> "Bolt for Python on Slack's Agents and Assistants APIs, Socket Mode, a pure-Python memory engine with budget-aware recall, consolidation and forgetting — running 24/7 on a Hugging Face Space. Mnemo: the Slack teammate that remembers. Thanks for watching."
+> "Mnemo also runs as an MCP server. That token I just minted in Slack connects Claude Desktop to my *exact* Slack memory — not a copy. Ask it anything I taught Mnemo in Slack, and it just knows — because it's reading and writing the same store."
+
+### 2:45–2:55 — Close (architecture diagram on screen)
+
+> "Bolt for Python on Slack's Assistant APIs, an MCP server for every other agent, and a memory engine underneath with budget-aware recall, consolidation, conflict detection, and forgetting — running 24/7 on a Hugging Face Space. Mnemo: the Slack teammate that remembers, everywhere. Thanks for watching."
 
 ---
 

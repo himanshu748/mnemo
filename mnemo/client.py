@@ -41,6 +41,7 @@ PROVIDERS: Dict[str, Dict[str, object]] = {
 OFFLINE_EMBED_DIM = 256
 
 _WORD = re.compile(r"[a-z0-9]+")
+_NUMBER = re.compile(r"\d+(?::\d+)?\s*(?:am|pm)?")
 
 
 def _tokenize(text: str) -> List[str]:
@@ -109,8 +110,10 @@ class LLMClient:
         return (message.get("content") or "").strip()
 
     def _chat_offline(self, messages: List[Dict[str, str]]) -> str:
-        """Grounded fallback so the pipeline runs without a key. Two modes:
+        """Grounded fallback so the pipeline runs without a key. Three modes:
         - summarize (consolidation): compress the user-supplied notes.
+        - classify (conflict detection): agree vs. conflict, by comparing the
+          numbers/times mentioned in each note.
         - answer: reply from whichever retrieved memory best overlaps the
           question (right retrieval -> right answer; none -> "I don't recall")."""
         system = ""
@@ -120,8 +123,11 @@ class LLMClient:
                 question = m.get("content", "")
             elif m.get("role") == "system":
                 system = m.get("content", "")
-        if "summarize" in system.lower():
+        system_l = system.lower()
+        if "summarize" in system_l:
             return self._summarize_offline(question)
+        if "agree" in system_l and "conflict" in system_l:
+            return self._classify_offline(question)
         q_terms = set(_tokenize(question))
         best_line, best_overlap = "", 0
         for line in system.splitlines():
@@ -134,6 +140,24 @@ class LLMClient:
         if best_overlap == 0:
             return "I don't have a memory relevant to that yet."
         return "Based on what I remember: %s" % best_line
+
+    @staticmethod
+    def _classify_offline(notes: str) -> str:
+        """Cheap heuristic for the offline demo: extract the numbers/times
+        mentioned in each note; if they don't all share a common value, the
+        notes are giving different answers to the same question -> conflict.
+        Real deployments let the LLM judge this (see _classify_cluster)."""
+        lines = [ln.lstrip("-*0123456789.) ").strip() for ln in notes.splitlines() if ln.strip()]
+        if len(lines) < 2:
+            return "agree"
+        num_sets = [set(_NUMBER.findall(ln.lower())) for ln in lines]
+        if not any(num_sets):
+            return "agree"  # no numbers to disagree about
+        common = set(num_sets[0])  # copy - `&=` below must not mutate num_sets[0]
+        for s in num_sets[1:]:
+            common &= s
+        all_nums = set().union(*num_sets)
+        return "conflict" if not common and len(all_nums) > 1 else "agree"
 
     @staticmethod
     def _summarize_offline(notes: str) -> str:

@@ -1,3 +1,6 @@
+__pycache__/
+*.pyc
+data/
 
 # generated from architecture.svg (qlmanage); upload manually to Devpost
 assets/architecture.png

@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 from mnemo.client import LLMClient
-from mnemo.router import MemoryRouter
+from mnemo.router import get_router
 from mnemo.agent import MemoryAgent
 
 
@@ -16,7 +16,9 @@ class SlackMemoryGlue:
     def __init__(self, token_budget: int = 400, data_dir: str = "data",
                  client: Optional[LLMClient] = None):
         self.client = client or LLMClient()
-        self.router = MemoryRouter(self.client, data_dir)
+        # Shared with the MCP server (mnemo/mcp_server.py) via a process-wide
+        # singleton keyed by data_dir, so both surfaces see the same writes.
+        self.router = get_router(self.client, data_dir)
         self.token_budget = token_budget
 
     def _agent(self, ns: str) -> MemoryAgent:

@@ -72,7 +72,7 @@ class MemoryAgent:
     def sleep(self) -> Dict[str, object]:
         """Run a consolidation + forgetting pass (call between sessions)."""
         before = self.store.stats()
-        new_semantic = self.store.consolidate()
+        new_semantic, conflicts = self.store.consolidate()
         pruned = self.store.decay_and_prune()
         after = self.store.stats()
         return {
@@ -80,4 +80,5 @@ class MemoryAgent:
             "after": after,
             "consolidated": [s.text for s in new_semantic],
             "pruned_count": len(pruned),
+            "conflicts": conflicts,
         }

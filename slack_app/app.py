@@ -5,6 +5,7 @@ Surfaces:
   * /remember <text>  — store a fact.
   * /recall <query>   — see what Mnemo recalls (budget-aware).
   * /sleep            — consolidate + forget (sleep-time pass).
+  * /mnemo-token      — mint a token to connect the same memory over MCP.
   * "Remember this" message shortcut — store any message.
   * @mention in a channel — channel-scoped memory chat.
 
@@ -19,15 +20,19 @@ import os
 import sys
 
 from slack_app.glue import SlackMemoryGlue  # no slack dependency
+from mnemo.namespace import channel_ns, user_ns
+
+MCP_URL = os.environ.get("MNEMO_MCP_URL", "https://himanshukumarjha-mnemo.hf.space/mcp")
 
 
 def _ns(team_id=None, user_id=None, channel_id=None) -> str:
     """Namespace memory: public channels are shared (per-channel); everything
-    else (DMs / assistant threads) is private (per-user)."""
-    team = team_id or "team"
+    else (DMs / assistant threads) is private (per-user). Shared with the MCP
+    surface (mnemo/tokens.py) so a Slack user and their own MCP client land on
+    the exact same private store."""
     if channel_id and str(channel_id).startswith("C"):
-        return "%s:channel:%s" % (team, channel_id)
-    return "%s:user:%s" % (team, user_id or "anon")
+        return channel_ns(team_id or "team", channel_id)
+    return user_ns(team_id or "team", user_id)
 
 
 def build_app():
@@ -97,6 +102,31 @@ def build_app():
         rep = glue.sleep(ns)
         respond("Slept 😴 — consolidated %d, pruned %d. Now: _%s_" % (
             len(rep["consolidated"]), rep["pruned_count"], rep["after"]))
+        for c in rep.get("conflicts", []):
+            bullets = "\n".join("• %s" % t for t in c["texts"])
+            respond(
+                text=("⚠️ *Conflicting memories* — these don't agree, so I kept "
+                      "both instead of merging them:\n%s\nLet me know which is "
+                      "current with `/remember <the correct fact>`." % bullets),
+                response_type="in_channel",
+            )
+
+    @app.command("/mnemo-token")
+    def _mnemo_token(ack, command, respond):
+        ack()
+        from mnemo.tokens import mint
+        team_id = command.get("team_id") or "team"
+        user_id = command.get("user_id")
+        token = mint(team_id, user_id)
+        respond(
+            "🔑 Your personal Mnemo MCP token — keep it private, it unlocks "
+            "*your* memory (the exact same one this Slack account uses):\n"
+            "```%s```\n"
+            "1. Add Mnemo as an MCP server: `claude mcp add --transport http mnemo %s`\n"
+            "2. Tell it once: “My mnemo token is %s — use it for every mnemo tool call.”\n"
+            "Then just talk to it — it reads and writes the exact memory Slack sees."
+            % (token, MCP_URL, token)
+        )
 
     @app.shortcut("remember_message")
     def _remember_message(ack, shortcut, context):
@@ -133,6 +163,23 @@ def selftest() -> None:
     print("stats       :", glue.stats(ns))
     assert "penicillin" in out["reply"].lower(), "expected recall of the allergy fact"
     print("\nSELFTEST OK")
+
+    # channel-shared memory + conflict detection (two teammates giving the
+    # bot different answers to the same question)
+    ns2 = _ns("T1", None, "C1")
+    glue.remember(ns2, "Standup is at 9am.")
+    glue.remember(ns2, "Standup is at 9:30am.")
+    rep = glue.sleep(ns2)
+    print("conflicts   :", rep["conflicts"])
+    assert rep["conflicts"], "expected the two standup times to be flagged as conflicting"
+    print("CONFLICT-DETECTION OK")
+
+    # MCP surface: same private namespace as the Slack user above
+    from mnemo.tokens import mint, verify
+    os.environ.setdefault("MNEMO_TOKEN_SECRET", "selftest-secret")
+    token = mint("T1", "U1")
+    assert verify(token) == ns, "MCP token must resolve to the same namespace Slack uses"
+    print("MCP TOKEN   : namespace matches Slack ✔")
 
 
 if __name__ == "__main__":

@@ -69,6 +69,7 @@ class MemoryRouter:
         self.data_dir = data_dir
         os.makedirs(self.data_dir, exist_ok=True)
         self._stores: Dict[str, MemoryStore] = {}
+        self._lock = threading.Lock()
         self._sync = _HFSnapshotSync()
 
     def _path(self, ns: str) -> str:
@@ -76,18 +77,19 @@ class MemoryRouter:
         return os.path.join(self.data_dir, safe + ".json")
 
     def store(self, ns: str) -> MemoryStore:
-        if ns not in self._stores:
-            store = MemoryStore(self.client)
-            path = self._path(ns)
-            if not os.path.exists(path):
-                self._sync.pull(os.path.basename(path), path)
-            if os.path.exists(path):
-                try:
-                    store.load(path)
-                except Exception:
-                    pass  # corrupt/old file -> start fresh rather than crash
-            self._stores[ns] = store
-        return self._stores[ns]
+        with self._lock:
+            if ns not in self._stores:
+                store = MemoryStore(self.client)
+                path = self._path(ns)
+                if not os.path.exists(path):
+                    self._sync.pull(os.path.basename(path), path)
+                if os.path.exists(path):
+                    try:
+                        store.load(path)
+                    except Exception:
+                        pass  # corrupt/old file -> start fresh rather than crash
+                self._stores[ns] = store
+            return self._stores[ns]
 
     def save(self, ns: str) -> None:
         path = self._path(ns)
@@ -96,3 +98,21 @@ class MemoryRouter:
 
     def namespaces(self) -> List[str]:
         return list(self._stores.keys())
+
+
+# Process-wide singleton per data_dir. The Slack bot (background thread) and
+# the MCP server (uvicorn's threadpool) are two independent callers in the
+# same process; if each built its own MemoryRouter they'd keep two separate
+# in-memory caches and go stale relative to each other's writes even though
+# both persist to the same directory. get_router() ensures every in-process
+# caller for a given data_dir shares one cache (and one lock).
+_ROUTERS: Dict[str, "MemoryRouter"] = {}
+_registry_lock = threading.Lock()
+
+
+def get_router(client: Optional[LLMClient] = None, data_dir: str = "data") -> "MemoryRouter":
+    key = os.path.abspath(data_dir)
+    with _registry_lock:
+        if key not in _ROUTERS:
+            _ROUTERS[key] = MemoryRouter(client, data_dir)
+        return _ROUTERS[key]
