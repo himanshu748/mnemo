@@ -1,5 +1,5 @@
-"""FastAPI surface for Mnemo — the deployable backend (this is what runs on
-Alibaba Cloud for the hackathon's deployment-proof requirement).
+"""FastAPI surface for Mnemo — a plain REST view of the memory engine, handy
+for local poking and for reusing the engine outside Slack.
 
 Run locally:
     uvicorn mnemo.api:app --reload --port 8000

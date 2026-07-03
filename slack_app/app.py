@@ -119,6 +119,8 @@ def build_app():
 
 
 def selftest() -> None:
+    import shutil
+    shutil.rmtree("/tmp/mnemo_selftest", ignore_errors=True)  # always start fresh
     glue = SlackMemoryGlue(data_dir="/tmp/mnemo_selftest")
     ns = _ns("T1", "U1", None)
     glue.remember(ns, "I am allergic to penicillin.", 0.9)

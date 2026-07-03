@@ -1,0 +1,96 @@
+<svg viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg" font-family="Menlo, Consolas, monospace">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b95a7"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="800" fill="#0c0e13"/>
+  <text x="48" y="52" fill="#e6e9ef" font-size="26" font-weight="bold">Mnemo — architecture</text>
+  <text x="48" y="78" fill="#8b95a7" font-size="14">A Slack teammate with long-term memory · Slack Agent Builder Challenge · track: New Slack Agent</text>
+
+  <!-- Slack column -->
+  <rect x="48" y="120" width="290" height="420" rx="12" fill="#151a24" stroke="#2b3446"/>
+  <text x="70" y="152" fill="#36c5f0" font-size="16" font-weight="bold">Slack workspace</text>
+  <text x="70" y="172" fill="#8b95a7" font-size="12">Slack AI capabilities (required tech)</text>
+
+  <rect x="70" y="192" width="246" height="64" rx="8" fill="#0f1420" stroke="#36c5f0"/>
+  <text x="86" y="218" fill="#e6e9ef" font-size="13" font-weight="bold">AI Assistant pane</text>
+  <text x="86" y="238" fill="#8b95a7" font-size="12">chat with memory + live status</text>
+
+  <rect x="70" y="268" width="246" height="84" rx="8" fill="#0f1420" stroke="#2b3446"/>
+  <text x="86" y="292" fill="#e6e9ef" font-size="13" font-weight="bold">Slash commands</text>
+  <text x="86" y="312" fill="#8b95a7" font-size="12">/remember · /recall · /sleep</text>
+  <text x="86" y="330" fill="#8b95a7" font-size="12">explicit memory controls</text>
+
+  <rect x="70" y="364" width="246" height="64" rx="8" fill="#0f1420" stroke="#2b3446"/>
+  <text x="86" y="388" fill="#e6e9ef" font-size="13" font-weight="bold">“Remember this” shortcut</text>
+  <text x="86" y="408" fill="#8b95a7" font-size="12">save any message to memory</text>
+
+  <rect x="70" y="440" width="246" height="64" rx="8" fill="#0f1420" stroke="#2b3446"/>
+  <text x="86" y="464" fill="#e6e9ef" font-size="13" font-weight="bold">@mnemo in channels</text>
+  <text x="86" y="484" fill="#8b95a7" font-size="12">shared, channel-scoped memory</text>
+
+  <!-- Socket mode arrow -->
+  <line x1="338" y1="330" x2="430" y2="330" stroke="#8b95a7" stroke-width="2" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <text x="384" y="312" fill="#8b95a7" font-size="12" text-anchor="middle">Socket Mode</text>
+  <text x="384" y="352" fill="#5c677a" font-size="11" text-anchor="middle">outbound WSS</text>
+  <text x="384" y="368" fill="#5c677a" font-size="11" text-anchor="middle">· no public URL</text>
+
+  <!-- HF Space container -->
+  <rect x="430" y="120" width="540" height="560" rx="12" fill="#151a24" stroke="#2b3446"/>
+  <text x="452" y="152" fill="#fbbf24" font-size="16" font-weight="bold">Hugging Face Space (Docker, 24/7)</text>
+  <text x="452" y="172" fill="#8b95a7" font-size="12">launcher.py — bot thread + health endpoint :7860</text>
+
+  <rect x="452" y="192" width="496" height="96" rx="8" fill="#0f1420" stroke="#2b3446"/>
+  <text x="468" y="216" fill="#e6e9ef" font-size="13" font-weight="bold">Bolt app (slack_app/app.py)</text>
+  <text x="468" y="236" fill="#8b95a7" font-size="12">Assistant handlers · commands · shortcut · mentions</text>
+  <text x="468" y="254" fill="#8b95a7" font-size="12">namespaces memory: DMs → per-user · channels → per-channel</text>
+  <text x="468" y="272" fill="#5c677a" font-size="11">team:user:U123        team:channel:C456</text>
+
+  <line x1="700" y1="288" x2="700" y2="316" stroke="#8b95a7" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="452" y="316" width="496" height="212" rx="8" fill="#0f1420" stroke="#34d399"/>
+  <text x="468" y="342" fill="#34d399" font-size="14" font-weight="bold">Mnemo memory engine (mnemo/)</text>
+  <text x="468" y="368" fill="#e6e9ef" font-size="12" font-weight="bold">① Budget-aware recall</text>
+  <text x="484" y="386" fill="#8b95a7" font-size="12">rank by relevance × importance, greedy-pack into a hard</text>
+  <text x="484" y="402" fill="#8b95a7" font-size="12">token budget — reply shows tokens used + % compression</text>
+  <text x="468" y="426" fill="#e6e9ef" font-size="12" font-weight="bold">② Write-back</text>
+  <text x="484" y="444" fill="#8b95a7" font-size="12">each exchange stored as episodic memory w/ salience score</text>
+  <text x="468" y="468" fill="#e6e9ef" font-size="12" font-weight="bold">③ Sleep-time pass (/sleep)</text>
+  <text x="484" y="486" fill="#8b95a7" font-size="12">cluster related episodics → LLM-summarized semantic facts;</text>
+  <text x="484" y="502" fill="#8b95a7" font-size="12">time-decayed, low-value memories are pruned (forgetting)</text>
+
+  <line x1="700" y1="528" x2="700" y2="556" stroke="#8b95a7" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="452" y="556" width="496" height="100" rx="8" fill="#0f1420" stroke="#2b3446"/>
+  <text x="468" y="582" fill="#e6e9ef" font-size="13" font-weight="bold">Persistence (per namespace)</text>
+  <text x="468" y="602" fill="#8b95a7" font-size="12">JSON store on local disk · saved after every write</text>
+  <text x="468" y="622" fill="#8b95a7" font-size="12">+ snapshot sync → private HF dataset, restored on reboot</text>
+  <text x="468" y="642" fill="#5c677a" font-size="11">(MNEMO_HF_DATASET + HF_TOKEN)</text>
+
+  <!-- LLM providers -->
+  <rect x="1010" y="316" width="222" height="212" rx="12" fill="#151a24" stroke="#2b3446"/>
+  <text x="1030" y="344" fill="#c084fc" font-size="14" font-weight="bold">LLM (pluggable)</text>
+  <text x="1030" y="368" fill="#8b95a7" font-size="12">OpenAI-compatible API:</text>
+  <text x="1030" y="392" fill="#e6e9ef" font-size="12">· Gemini Flash (default)</text>
+  <text x="1030" y="412" fill="#e6e9ef" font-size="12">· OpenAI / Qwen</text>
+  <text x="1030" y="432" fill="#e6e9ef" font-size="12">· offline fallback (no key)</text>
+  <text x="1030" y="462" fill="#8b95a7" font-size="12">chat = answer + consolidate</text>
+  <text x="1030" y="482" fill="#8b95a7" font-size="12">embeddings = recall ranking</text>
+
+  <line x1="948" y1="422" x2="1010" y2="422" stroke="#8b95a7" stroke-width="2" marker-end="url(#arr)" marker-start="url(#arr)"/>
+
+  <!-- HF dataset -->
+  <rect x="1010" y="576" width="222" height="80" rx="12" fill="#151a24" stroke="#2b3446"/>
+  <text x="1030" y="604" fill="#fbbf24" font-size="13" font-weight="bold">HF dataset (private)</text>
+  <text x="1030" y="624" fill="#8b95a7" font-size="12">memory snapshots —</text>
+  <text x="1030" y="642" fill="#8b95a7" font-size="12">survives Space rebuilds</text>
+  <line x1="948" y1="612" x2="1010" y2="612" stroke="#8b95a7" stroke-width="2" marker-end="url(#arr)" marker-start="url(#arr)"/>
+
+  <!-- keep-alive -->
+  <rect x="430" y="712" width="540" height="56" rx="12" fill="#151a24" stroke="#2b3446"/>
+  <text x="452" y="736" fill="#e6e9ef" font-size="13" font-weight="bold">GitHub Action keep-alive</text>
+  <text x="452" y="754" fill="#8b95a7" font-size="12">cron ping on the health endpoint — the free Space never sleeps during judging</text>
+  <line x1="700" y1="712" x2="700" y2="680" stroke="#5c677a" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+</svg>

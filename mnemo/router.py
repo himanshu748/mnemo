@@ -3,14 +3,64 @@
 In Slack, each user (in a DM/assistant thread) and each channel gets its own
 isolated memory, keyed by a namespace string like "T123:user:U456" or
 "T123:channel:C789". Stores are lazy-loaded from disk and saved after writes.
+
+Snapshot sync (optional): ephemeral hosts like free HF Spaces lose local disk
+on rebuild. Set MNEMO_HF_DATASET (e.g. "user/mnemo-memory") and HF_TOKEN and
+every save is mirrored to that private dataset repo; missing local files are
+restored from it on first access. Without those env vars this is inert.
 """
 from __future__ import annotations
 
 import os
+import threading
 from typing import Dict, List, Optional
 
 from .client import LLMClient
 from .memory import MemoryStore
+
+
+class _HFSnapshotSync:
+    """Fire-and-forget mirror of memory JSON files to a HF dataset repo."""
+
+    def __init__(self) -> None:
+        self.repo = os.environ.get("MNEMO_HF_DATASET", "")
+        self.enabled = bool(self.repo and os.environ.get("HF_TOKEN"))
+        self._ready = False
+
+    def _api(self):
+        from huggingface_hub import HfApi
+        api = HfApi(token=os.environ["HF_TOKEN"])
+        if not self._ready:
+            api.create_repo(self.repo, repo_type="dataset", private=True, exist_ok=True)
+            self._ready = True
+        return api
+
+    def push(self, path: str) -> None:
+        if not self.enabled:
+            return
+
+        def _upload():
+            try:
+                self._api().upload_file(
+                    path_or_fileobj=path, path_in_repo="memory/" + os.path.basename(path),
+                    repo_id=self.repo, repo_type="dataset")
+            except Exception as exc:
+                print("[mnemo] snapshot push failed:", exc, flush=True)
+
+        threading.Thread(target=_upload, daemon=True).start()
+
+    def pull(self, filename: str, dest: str) -> None:
+        if not self.enabled:
+            return
+        try:
+            from huggingface_hub import hf_hub_download
+            got = hf_hub_download(self.repo, "memory/" + filename, repo_type="dataset",
+                                  token=os.environ["HF_TOKEN"])
+            with open(got, "rb") as src, open(dest, "wb") as out:
+                out.write(src.read())
+            print("[mnemo] restored %s from %s" % (filename, self.repo), flush=True)
+        except Exception:
+            pass  # nothing snapshotted yet for this namespace
 
 
 class MemoryRouter:
@@ -19,6 +69,7 @@ class MemoryRouter:
         self.data_dir = data_dir
         os.makedirs(self.data_dir, exist_ok=True)
         self._stores: Dict[str, MemoryStore] = {}
+        self._sync = _HFSnapshotSync()
 
     def _path(self, ns: str) -> str:
         safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in ns)
@@ -28,6 +79,8 @@ class MemoryRouter:
         if ns not in self._stores:
             store = MemoryStore(self.client)
             path = self._path(ns)
+            if not os.path.exists(path):
+                self._sync.pull(os.path.basename(path), path)
             if os.path.exists(path):
                 try:
                     store.load(path)
@@ -37,7 +90,9 @@ class MemoryRouter:
         return self._stores[ns]
 
     def save(self, ns: str) -> None:
-        self.store(ns).save(self._path(ns))
+        path = self._path(ns)
+        self.store(ns).save(path)
+        self._sync.push(path)
 
     def namespaces(self) -> List[str]:
         return list(self._stores.keys())
