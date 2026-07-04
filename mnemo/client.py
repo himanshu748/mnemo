@@ -1,6 +1,7 @@
 """LLM client for Mnemo — provider-agnostic (OpenAI-compatible).
 
 Works with any OpenAI-compatible chat + embeddings API. Built-in presets:
+  - huggingface (HF Inference Providers; free tier, no per-provider signup)
   - gemini  (Google AI Studio OpenAI-compatible endpoint; free tier, India-OK)
   - openai
   - qwen    (Alibaba DashScope International)
@@ -9,6 +10,12 @@ Selection order (per field): explicit arg > LLM_* env > provider preset.
 Provider is chosen via LLM_PROVIDER, else auto-detected from whichever API key
 is present, else "offline". With no key it falls back to a deterministic
 offline implementation so the system stays demoable and testable.
+
+Note on "huggingface": its chat completions are OpenAI-compatible (the normal
+_chat_remote path below), but its embeddings are NOT — Inference Providers'
+router only exposes an OpenAI-shaped endpoint for chat, so embeddings for this
+provider go through the huggingface_hub SDK's feature_extraction call instead
+(see _embed_remote's huggingface branch).
 """
 from __future__ import annotations
 
@@ -19,6 +26,16 @@ import re
 from typing import Dict, List, Optional
 
 PROVIDERS: Dict[str, Dict[str, object]] = {
+    "huggingface": {
+        "base_url": "https://router.huggingface.co/v1",
+        # A direct-response instruct model, not a reasoning model: gpt-oss-*
+        # and similar reasoning models spend max_tokens on hidden CoT before
+        # any visible content, which silently empties out Mnemo's small
+        # per-call budgets (e.g. the 5-token conflict classifier).
+        "chat_model": "meta-llama/Llama-3.1-8B-Instruct:fastest",
+        "embed_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "key_env": ["HF_TOKEN", "HUGGINGFACE_API_KEY"],
+    },
     "gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
         "chat_model": "gemini-2.5-flash",
@@ -192,6 +209,8 @@ class LLMClient:
         return [self._embed_offline(t) for t in texts]
 
     def _embed_remote(self, texts: List[str]) -> List[List[float]]:
+        if self.provider == "huggingface":
+            return self._embed_huggingface(texts)
         import requests
 
         url = "%s/embeddings" % self.base_url
@@ -199,6 +218,22 @@ class LLMClient:
         resp = requests.post(url, json={"model": self.embed_model, "input": texts}, headers=headers, timeout=60)
         resp.raise_for_status()
         return [row["embedding"] for row in resp.json()["data"]]
+
+    def _embed_huggingface(self, texts: List[str]) -> List[List[float]]:
+        # Inference Providers' OpenAI-compatible router is chat-only - there is
+        # no /v1/embeddings there, so embeddings go through the huggingface_hub
+        # SDK's feature_extraction call instead (one request per text; Mnemo
+        # only ever embeds 1-2 texts at a time, so this isn't a batching concern).
+        from huggingface_hub import InferenceClient as HFInferenceClient
+
+        client = HFInferenceClient(provider="hf-inference", token=self.api_key)
+        out: List[List[float]] = []
+        for text in texts:
+            vec = client.feature_extraction(text, model=self.embed_model)
+            if vec.ndim > 1:
+                vec = vec.mean(axis=0)  # mean-pool token embeddings -> one vector
+            out.append(vec.tolist())
+        return out
 
     def _embed_offline(self, text: str) -> List[float]:
         """Deterministic hashed bag-of-words embedding (L2-normalized). Not
