@@ -4,8 +4,9 @@ pydantic>=2.6
 requests>=2.31
 # Slack app
 slack-bolt>=1.20
-# Optional memory snapshot sync to a HF dataset (needs MNEMO_HF_DATASET + HF_TOKEN)
-huggingface_hub>=0.23
+# Memory snapshot sync (MNEMO_HF_DATASET + HF_TOKEN) + the huggingface LLM
+# provider's embeddings (needs Inference Providers routing support)
+huggingface_hub>=0.27
 # MCP server: shares the same memory with Claude Desktop/Code and other MCP clients
 mcp>=1.9
 starlette>=0.37
